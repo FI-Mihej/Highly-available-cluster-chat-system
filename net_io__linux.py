@@ -63,7 +63,7 @@ class NetIO(NetIOBase):
             connection.worker_obj.connection = connection
 
         self.method.add_connection(connection.conn)
-        self._check_is_connection_need_to_sent_data(connection)
+        self.check_is_connection_need_to_sent_data(connection)
 
     def remove_connection(self, connection: Connection):
         connection.connection_state = ConnectionState.waiting_for_disconnection
@@ -78,7 +78,7 @@ class NetIO(NetIOBase):
             self.add_connection(new_connection)
             try:
                 new_connection.worker_obj.on_connect()
-                self._check_is_connection_need_to_sent_data(new_connection)
+                self.check_is_connection_need_to_sent_data(new_connection)
             except:
                 self._set_connection_to_be_closed(new_connection, ConnectionState.worker_fault)
         except BlockingIOError:
@@ -91,7 +91,7 @@ class NetIO(NetIOBase):
         connection.connection_state = ConnectionState.connected
         try:
             connection.worker_obj.on_connect()
-            self._check_is_connection_need_to_sent_data(connection)
+            self.check_is_connection_need_to_sent_data(connection)
         except:
             self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
 
@@ -102,7 +102,7 @@ class NetIO(NetIOBase):
                 connection.read_data += another_read_data_part
                 try:
                     connection.worker_obj.on_read()
-                    self._check_is_connection_need_to_sent_data(connection)
+                    self.check_is_connection_need_to_sent_data(connection)
                 except:
                     self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
             else:
@@ -119,7 +119,7 @@ class NetIO(NetIOBase):
             if not connection.must_be_written_data:
                 try:
                     connection.worker_obj.on_no_more_data_to_write()
-                    self._check_is_connection_need_to_sent_data(connection)
+                    self.check_is_connection_need_to_sent_data(connection)
                 except:
                     self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
         except BlockingIOError:
@@ -187,10 +187,10 @@ class NetIO(NetIOBase):
         new_connection = Connection(self._get_new_connection_id(), connection_info, conn_and_address_pair,
                                     ConnectionState.connected, name)
         self.add_connection(new_connection)
-        
+
         try:
             new_connection.worker_obj.on_connect()
-            self._check_is_connection_need_to_sent_data(new_connection)
+            self.check_is_connection_need_to_sent_data(new_connection)
         except:
             self._set_connection_to_be_closed(new_connection, ConnectionState.worker_fault)
 
@@ -214,7 +214,7 @@ class NetIO(NetIOBase):
         connection.connection_state = state
         self.method.set__should_be_closed(connection.conn)
 
-    def _check_is_connection_need_to_sent_data(self, connection: Connection):
+    def check_is_connection_need_to_sent_data(self, connection: Connection):
         if connection.must_be_written_data:
             if not isinstance(connection.must_be_written_data, memoryview):
                 connection.must_be_written_data = memoryview(connection.must_be_written_data)

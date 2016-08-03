@@ -134,6 +134,9 @@ class NetIOUserApi:
     def remove_connection(self, connection: Connection):
         raise NotImplemented
 
+    def check_is_connection_need_to_sent_data(self, connection: Connection):
+        raise NotImplemented
+
 
 class NetIOCallbacks:
     def __init__(self):
