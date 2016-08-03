@@ -38,13 +38,15 @@ class NetIO(NetIOBase):
     def stop(self):
         self._need_to_stop = True
 
-    def make_connection(self, connection_info: ConnectionInfo=None, name=None):
+    def make_connection(self, connection_info: ConnectionInfo=None, name=None)->Connection:
+        new_connection = None
         if ConnectionType.passive == connection_info.connection_type:
-            self._make_passive_connection(connection_info, name)
+            new_connection = self._make_passive_connection(connection_info, name)
         elif ConnectionType.active_connected == connection_info.connection_type:
-            self._make_active_connected_connection(connection_info, name)
+            new_connection = self._make_active_connected_connection(connection_info, name)
         else:
             raise WrongConnectionType()
+        return new_connection
 
     def add_connection(self, connection: Connection):
         self.all_connections.add(connection)
@@ -168,6 +170,7 @@ class NetIO(NetIOBase):
                                     ConnectionState.waiting_for_connection, name)
         self.add_connection(new_connection)
         self.method.set__need_write(new_connection.conn, True)
+        return new_connection
 
     def _make_passive_connection(self, connection_info: ConnectionInfo=None, name=None)->Connection:
         conn = None
@@ -184,6 +187,7 @@ class NetIO(NetIOBase):
         new_connection = Connection(self._get_new_connection_id(), connection_info, conn_and_address_pair,
                                     ConnectionState.connected, name)
         self.add_connection(new_connection)
+        return new_connection
 
     def _remove_connection_from_internal_structures(self, connection: Connection):
         if connection in self.all_connections:

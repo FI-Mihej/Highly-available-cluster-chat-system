@@ -125,7 +125,7 @@ class NetIOUserApi:
     def stop(self):
         raise NotImplemented
 
-    def make_connection(self, connection_info: ConnectionInfo = None, name=None):
+    def make_connection(self, connection_info: ConnectionInfo = None, name=None)->Connection:
         raise NotImplemented
 
     def add_connection(self, connection: Connection):
