@@ -6,6 +6,7 @@ from transport_protocol_constants import *
 import marshal
 import sys
 from threading import Thread, Lock
+from multiprocessing import Process
 from random import randint
 
 """
@@ -146,8 +147,9 @@ class ConsoleInputThread(Thread):
                 self.global_data.input_messages.append(new_string)
 
 
-class Client:
+class Client(Process):
     def __init__(self, all_servers_list: list=None):
+        super().__init__()
         self.all_servers_list = all_servers_list
         if self.all_servers_list is None:
             self.all_servers_list = load_server_list()
