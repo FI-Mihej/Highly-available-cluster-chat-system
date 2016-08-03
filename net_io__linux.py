@@ -142,7 +142,10 @@ class NetIO(NetIOBase):
     def _construct_active_accepted_connection(self, base_passive_connection: Connection,
                                               conn_and_address_pair: tuple):
         conn, address = conn_and_address_pair
-        new_connection_info = ConnectionInfo(copy.copy(base_passive_connection.worker_obj),
+        new_worker_obj = copy.copy(base_passive_connection.worker_obj)
+        new_worker_obj.api = None
+        new_worker_obj.connection = None
+        new_connection_info = ConnectionInfo(new_worker_obj,
                                              ConnectionType.active_accepted,
                                              address, conn.family, conn.type, conn.proto)
         new_connection = Connection(self._get_new_connection_id(), new_connection_info, conn_and_address_pair,

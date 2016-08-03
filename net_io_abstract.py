@@ -57,7 +57,7 @@ class WorkerBase:
         pass
 
     def __copy__(self):
-        return WorkerBase(self.api, self.connection)
+        raise NotImplemented
 
 
 class ConnectionInfo:
