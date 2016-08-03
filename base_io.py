@@ -211,6 +211,12 @@ class NetIO(NetIOBase):
         if connection.connection_name is not None:
             self.connection_by_name[connection.connection_name] = connection
         self.connection_by_fileno[connection.conn.fileno()] = connection
+
+        if connection.worker_obj.api is None:
+            connection.worker_obj.api = self
+        if connection.worker_obj.connection is None:
+            connection.worker_obj.connection = connection
+            
         self.method.add_connection(connection.conn)
         self._check_is_connection_need_to_sent_data(connection)
 
