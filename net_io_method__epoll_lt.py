@@ -1,5 +1,5 @@
 import select
-from net_io__abstract import *
+from net_io_abstract import *
 
 
 """
