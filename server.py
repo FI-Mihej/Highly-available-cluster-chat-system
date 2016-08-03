@@ -2,6 +2,7 @@ from net_io__linux import *
 from net_io_method__epoll_lt import *
 from transport_protocol import *
 from server_list_loader import load_server_list
+from transport_protocol_constants import *
 import marshal
 import sys
 
@@ -104,8 +105,8 @@ class MainWorker(WorkerBase):
         for address in self.global_data.deployed_servers_addresses:
             connection = self.check_connection_to_the_server(address)
             message = {
-                'name': 'server arrived',
-                'address': self.global_data.own_address
+                FieldName.name: RPCName.server_arrived,
+                FieldName.address: self.global_data.own_address
             }
             bin_message = marshal.dumps(message)
             packed_message = pack_message(bin_message)
@@ -116,8 +117,8 @@ class MainWorker(WorkerBase):
         for address in self.global_data.deployed_servers_addresses:
             connection = self.check_connection_to_the_server(address)
             message = {
-                'name': 'number of clients changed',
-                'clients': self.global_data.number_of_clients
+                FieldName.name: RPCName.number_of_clients_changed,
+                FieldName.clients: self.global_data.number_of_clients
             }
             bin_message = marshal.dumps(message)
             packed_message = pack_message(bin_message)
@@ -128,8 +129,8 @@ class MainWorker(WorkerBase):
         for address in self.global_data.deployed_servers_addresses:
             connection = self.check_connection_to_the_server(address)
             message = {
-                'name': 'broadcast string',
-                'string': client_string
+                FieldName.name: RPCName.broadcast_string,
+                FieldName.string: client_string
             }
             bin_message = marshal.dumps(message)
             packed_message = pack_message(bin_message)
@@ -143,8 +144,8 @@ class MainWorker(WorkerBase):
             if connection == self.connection:
                 continue
             message = {
-                'name': 'print string',
-                'string': client_string
+                FieldName.name: RPCName.print_string,
+                FieldName.string: client_string
             }
             bin_message = marshal.dumps(message)
             packed_message = pack_message(bin_message)
@@ -153,8 +154,8 @@ class MainWorker(WorkerBase):
 
     def message_handler(self, message: bytes):
         message = marshal.loads(message)
-        if 'server arrived' == message['name']:
-            address = message['address']
+        if RPCName.server_arrived == message[FieldName.name]:
+            address = message[FieldName.address]
             if address in self.global_data.deployed_servers_addresses:
                 if not self.is_connection_to_the_server:
                     self.global_data.number_of_clients -= 1
@@ -165,18 +166,26 @@ class MainWorker(WorkerBase):
                 self.global_data.server_by_connection_id[self.connection.connection_id] = address
             else:
                 self.api.remove_connection(self.connection)
-        elif 'number of clients changed' == message['name']:
+        elif RPCName.number_of_clients_changed == message[FieldName.name]:
             if self.server_address is not None:
-                self.global_data.clients_per_server[self.server_address] = message['clients']
-        elif 'client string' == message['name']:
-            client_string = message['string']
+                self.global_data.clients_per_server[self.server_address] = message[FieldName.clients]
+        elif RPCName.client_string == message[FieldName.name]:
+            client_string = message[FieldName.string]
             self.broadcast_client_string(client_string)
             self.broadcast_client_string_to_own_clients(client_string)
-        elif 'give me best server' == message['name']:
+        elif RPCName.give_me_best_server == message[FieldName.name]:
             best_server_address = min(self.global_data.clients_per_server, key=self.global_data.clients_per_server.get)
             message = {
-                'name': 'best server',
-                'address': best_server_address
+                FieldName.name: RPCName.best_server,
+                FieldName.address: best_server_address
+            }
+            bin_message = marshal.dumps(message)
+            packed_message = pack_message(bin_message)
+            self.connection.must_be_written_data += packed_message
+        elif RPCName.give_me_clients_per_server == message[FieldName.name]:
+            message = {
+                FieldName.name: RPCName.clients_per_server,
+                FieldName.clients_per_server: self.global_data.clients_per_server
             }
             bin_message = marshal.dumps(message)
             packed_message = pack_message(bin_message)
