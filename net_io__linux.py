@@ -23,7 +23,7 @@ class NetIO(NetIOBase):
     def destroy(self):
         self.method.destroy()
 
-    def start(self):
+    def start(self, destroy_on_finish=True):
         if self._already_begun:
             raise LoopIsAlreadyBegun()
 
@@ -33,7 +33,8 @@ class NetIO(NetIOBase):
                 self.method.loop_iteration()
         finally:
             self._already_begun = False
-            self.destroy()
+            if destroy_on_finish:
+                self.destroy()
 
     def stop(self):
         self._need_to_stop = True

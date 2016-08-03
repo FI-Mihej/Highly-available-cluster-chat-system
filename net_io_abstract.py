@@ -2,6 +2,7 @@ import socket
 import errno
 import copy
 import enum
+from contextlib import contextmanager
 
 """
 Module Docstring
@@ -119,7 +120,7 @@ class NetIOUserApi:
         self.connection_by_name = dict()
         self.connection_by_fileno = dict()
 
-    def start(self):
+    def start(self, destroy_on_finish=True):
         raise NotImplemented
 
     def stop(self):
@@ -164,6 +165,15 @@ class NetIOBase(NetIOUserApi, NetIOCallbacks):
 
     def destroy(self):
         raise NotImplemented
+
+
+@contextmanager
+def net_io(net_io_obj: NetIOBase):
+    try:
+        yield net_io_obj
+        net_io_obj.start(destroy_on_finish=False)
+    finally:
+        net_io_obj.destroy()
 
 
 class IOMethodBase:
