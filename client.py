@@ -37,12 +37,17 @@ class MainWorker(WorkerBase):
         self.connected_to_destination_server = False
         self.is_normal_reconnection = False
 
+        self.input_rpc_handlers = dict()
+        self.prepare_input_rpc_handlers()
+
     def on_connect(self):
         if self.global_data.clients_per_server:
+            # already got clients_per_server dict. This means that we currently already connected to best server.
             self.connected_to_destination_server = True
             print('CONNECTED TO SERVER ({})'.format(self.server_address))
             print()
         else:
+            # need to get clients_per_server dict from current (random) server
             self.send_request__give_me_clients_per_server()
 
     def on_read(self):
@@ -50,12 +55,13 @@ class MainWorker(WorkerBase):
             while True:
                 message, remaining_data = get_message(self.connection.read_data)
                 self.connection.read_data = remaining_data
-                self.message_handler(message)
+                self.input_message_handler(message)
         except ThereIsNoMessages:
             return
 
     def on_no_more_data_to_write(self):
         if self.connected_to_destination_server:
+            # server has send all data, so we ned to check user input for some new strings
             with self.global_data.lock_for__input_messages:
                 for string in self.global_data.input_messages:
                     self.send_request__client_string(string)
@@ -113,17 +119,26 @@ class MainWorker(WorkerBase):
         packed_message = pack_message(bin_message)
         self.connection.must_be_written_data += packed_message
 
-    def message_handler(self, message: bytes):
+    def input_message_handler(self, message: bytes):
         message = marshal.loads(message)
-        if RPCName.clients_per_server == message[FieldName.name]:
-            self.global_data.clients_per_server = message[FieldName.clients_per_server]
-            server_address = min(self.global_data.clients_per_server, key=self.global_data.clients_per_server.get)
-            if server_address != self.server_address:
-                self.is_normal_reconnection = True
-                self.api.remove_connection(self.connection)
-        elif RPCName.print_string == message[FieldName.name]:
-            string = message[FieldName.string]
-            print('IN: "{}"'.format(string))
+        self.input_rpc_handlers[message[FieldName.name]](message)
+
+    def prepare_input_rpc_handlers(self):
+        self.input_rpc_handlers = {
+            RPCName.clients_per_server: self.rpc_input__clients_per_server,
+            RPCName.print_string: self.rpc_input__print_string,
+        }
+
+    def rpc_input__clients_per_server(self, message):
+        self.global_data.clients_per_server = message[FieldName.clients_per_server]
+        server_address = min(self.global_data.clients_per_server, key=self.global_data.clients_per_server.get)
+        if server_address != self.server_address:
+            self.is_normal_reconnection = True
+            self.api.remove_connection(self.connection)
+
+    def rpc_input__print_string(self, message):
+        string = message[FieldName.string]
+        print('IN: "{}"'.format(string))
 
 
 class ConsoleInputThread(Thread):
