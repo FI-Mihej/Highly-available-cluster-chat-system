@@ -15,5 +15,7 @@ def load_server_list(file_name=FILE_NAME):
         data = file.read()
         data_lines = data.split(b'\n')
         for line in data_lines:
-            result_list.append(line.strip())
+            line = line.strip()
+            if line:
+                result_list.append(eval(line))
     return result_list
