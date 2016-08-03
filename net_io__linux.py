@@ -187,6 +187,13 @@ class NetIO(NetIOBase):
         new_connection = Connection(self._get_new_connection_id(), connection_info, conn_and_address_pair,
                                     ConnectionState.connected, name)
         self.add_connection(new_connection)
+        
+        try:
+            new_connection.worker_obj.on_connect()
+            self._check_is_connection_need_to_sent_data(new_connection)
+        except:
+            self._set_connection_to_be_closed(new_connection, ConnectionState.worker_fault)
+
         return new_connection
 
     def _remove_connection_from_internal_structures(self, connection: Connection):
