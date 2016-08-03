@@ -226,10 +226,10 @@ class NetIO(NetIOBase):
             new_connection = self._construct_active_accepted_connection(connection, conn_and_address_pair)
             self.add_connection(new_connection)
             try:
-                connection.worker_obj.on_connect()
-                self._check_is_connection_need_to_sent_data(connection)
+                new_connection.worker_obj.on_connect()
+                self._check_is_connection_need_to_sent_data(new_connection)
             except:
-                self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
+                self._set_connection_to_be_closed(new_connection, ConnectionState.worker_fault)
         except BlockingIOError:
             pass
         except:
