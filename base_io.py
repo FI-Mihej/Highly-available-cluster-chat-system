@@ -4,8 +4,6 @@ import errno
 import copy
 import enum
 
-from tornado.platform.select import _Select
-
 """
 Module Docstring
 Docstrings: http://www.python.org/dev/peps/pep-0257/
@@ -216,7 +214,7 @@ class NetIO(NetIOBase):
             connection.worker_obj.api = self
         if connection.worker_obj.connection is None:
             connection.worker_obj.connection = connection
-            
+
         self.method.add_connection(connection.conn)
         self._check_is_connection_need_to_sent_data(connection)
 
