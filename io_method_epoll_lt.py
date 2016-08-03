@@ -11,7 +11,7 @@ __author__ = 'ButenkoMS <gtalk@butenkoms.space>'
 
 
 class IOMethodEpollLT(IOMethodBase):
-    def __init__(self, interface: NetIO):
+    def __init__(self, interface: NetIOBase):
         super().__init__(interface)
         self.epoll = select.epoll()
 
