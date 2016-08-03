@@ -5,6 +5,7 @@ from server_list_loader import load_server_list
 from transport_protocol_constants import *
 import marshal
 import sys
+from multiprocessing import Process
 
 
 """
@@ -192,8 +193,9 @@ class MainWorker(WorkerBase):
             self.connection.must_be_written_data += packed_message
 
 
-class Server:
+class Server(Process):
     def __init__(self, own_server_address, all_server_list: list=None):
+        super().__init__()
         self.own_server_address = own_server_address
         self.all_server_list = all_server_list
         if self.all_server_list is None:
