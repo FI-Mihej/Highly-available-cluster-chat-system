@@ -397,11 +397,19 @@ class IOMethodEpollLT(IOMethodBase):
         events = self.epoll.poll(1)
         for fileno, event in events:
             connection = self.interface.connection_by_fileno[fileno]
-            if ConnectionType.passive == connection.connection_info.connection_type:
-                self.interface.on_accept_connection(connection)
-            elif event & select.EPOLLIN:
-                self.interface.on_read(connection)
+
+            if event & select.EPOLLIN:
+                # Read available. We can try to read even even if an error occurred
+                if ConnectionType.passive == connection.connection_info.connection_type:
+                    self.interface.on_accept_connection(connection)
+                else:
+                    self.interface.on_read(connection)
+
+            if event & select.EPOLLHUP:
+                # Some error. Close connection
+                self.should_be_closed.add(connection.conn)
             elif event & select.EPOLLOUT:
+                # Write available. We will not write data if an error occurred
                 if ConnectionState.waiting_for_connection == connection.connection_state:
                     if not connection.conn.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR):
                         # Connected successfully:
@@ -411,8 +419,6 @@ class IOMethodEpollLT(IOMethodBase):
                         self.should_be_closed.add(connection.conn)
                 else:
                     self.interface.on_write(connection)
-            elif event & select.EPOLLHUP:
-                self.should_be_closed.add(connection.conn)
 
             self._close_all()
 
