@@ -13,7 +13,6 @@ class NetIO(NetIOBase):
     def __init__(self, transport):
         super().__init__()
         self.method = transport(self)
-        self.method = IOMethodBase(self)
 
         self._need_to_stop = False
         self._already_begun = False

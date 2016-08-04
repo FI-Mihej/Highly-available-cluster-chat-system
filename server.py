@@ -95,6 +95,7 @@ class MainWorker(WorkerBase):
 
     def change_number_of_connected_clients(self, delta_num: int):
         self.global_data.number_of_clients += delta_num
+        self.global_data.clients_per_server[self.global_data.own_address] = self.global_data.number_of_clients
         self.broadcast_number_of_clients_changed()
 
     def check_connection_to_the_server(self, address)->Connection:
@@ -228,6 +229,8 @@ class Server(Process):
         self.global_data = GlobalDataForAllWorkers()
         self.global_data.own_address = self.own_server_address
         for address in self.all_server_list:
+            if address == self.own_server_address:
+                continue
             self.global_data.deployed_servers_addresses[address] = None
 
     def run(self):

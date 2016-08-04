@@ -40,30 +40,9 @@ class ConnectionState(enum.Enum):
     disconnected = 6
 
 
-class WorkerBase:
-    def __init__(self, api: NetIOUserApi=None, connection: Connection=None):
-        self.api = api
-        self.connection = connection
-
-    def on_connect(self):
-        pass
-
-    def on_read(self):
-        pass
-
-    def on_no_more_data_to_write(self):
-        pass
-
-    def on_connection_lost(self):
-        pass
-
-    def __copy__(self):
-        raise NotImplemented
-
-
 class ConnectionInfo:
     def __init__(self,
-                 worker_obj: WorkerBase,
+                 worker_obj,
                  connection_type: ConnectionType,
                  socket_address=None,
                  socket_family=socket.AF_INET,
@@ -121,22 +100,22 @@ class NetIOUserApi:
         self.connection_by_fileno = dict()
 
     def start(self, destroy_on_finish=True):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def stop(self):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def make_connection(self, connection_info: ConnectionInfo = None, name=None)->Connection:
-        raise NotImplemented
+        raise NotImplementedError()
 
     def add_connection(self, connection: Connection):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def remove_connection(self, connection: Connection):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def check_is_connection_need_to_sent_data(self, connection: Connection):
-        raise NotImplemented
+        raise NotImplementedError()
 
 
 class NetIOCallbacks:
@@ -144,19 +123,19 @@ class NetIOCallbacks:
         super().__init__()
 
     def on_accept_connection(self, connection: Connection):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def on_connected(self, connection: Connection):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def on_read(self, connection: Connection):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def on_write(self, connection: Connection):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def on_close(self, connection: Connection):
-        raise NotImplemented
+        raise NotImplementedError()
 
 
 class NetIOBase(NetIOUserApi, NetIOCallbacks):
@@ -164,7 +143,28 @@ class NetIOBase(NetIOUserApi, NetIOCallbacks):
         super().__init__()
 
     def destroy(self):
-        raise NotImplemented
+        raise NotImplementedError()
+
+
+class WorkerBase:
+    def __init__(self, api: NetIOUserApi=None, connection: Connection=None):
+        self.api = api
+        self.connection = connection
+
+    def on_connect(self):
+        pass
+
+    def on_read(self):
+        pass
+
+    def on_no_more_data_to_write(self):
+        pass
+
+    def on_connection_lost(self):
+        pass
+
+    def __copy__(self):
+        raise NotImplementedError()
 
 
 @contextmanager
@@ -183,22 +183,22 @@ class IOMethodBase:
         pass
 
     def loop_iteration(self):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def destroy(self):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def set__can_read(self, conn: socket.socket, state=True):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def set__need_write(self, conn: socket.socket, state=True):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def set__should_be_closed(self, conn: socket.socket):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def add_connection(self, conn: socket.socket):
-        raise NotImplemented
+        raise NotImplementedError()
 
     def remove_connection(self, conn: socket.socket):
-        raise NotImplemented
+        raise NotImplementedError()

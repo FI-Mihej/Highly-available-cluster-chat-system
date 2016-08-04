@@ -45,14 +45,14 @@ class IOMethodEpollLT(IOMethodBase):
             self._close_all()
 
     def _close_all(self):
-        for conn in self.should_be_closed:
+        should_be_closed = self.should_be_closed
+        self.should_be_closed = set()
+        for conn in should_be_closed:
             if conn.fileno() in self.interface.connection_by_fileno:
                 connection = self.interface.connection_by_fileno[conn.fileno()]
                 self.interface.on_close(connection)
             else:
                 self.remove_connection(conn)
-        if self.should_be_closed:
-            self.should_be_closed = set()
 
     def destroy(self):
         self._close_all()
