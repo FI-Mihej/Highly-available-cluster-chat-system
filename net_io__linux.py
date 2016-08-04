@@ -21,6 +21,8 @@ class NetIO(NetIOBase):
 
         self._new_connection_id = 0
 
+        self.need_to_print_exceptions_info = False
+
     def destroy(self):
         self.method.destroy()
 
@@ -82,12 +84,12 @@ class NetIO(NetIOBase):
                 new_connection.worker_obj.on_connect()
                 self.check_is_connection_need_to_sent_data(new_connection)
             except:
-                self.log_exception()
+                if __debug__: self.log_exception()
                 self._set_connection_to_be_closed(new_connection, ConnectionState.worker_fault)
         except BlockingIOError:
             pass
         except:
-            self.log_exception()
+            if __debug__: self.log_exception()
             if new_conn is not None:
                 self.method.should_be_closed.add(new_conn)
 
@@ -97,7 +99,7 @@ class NetIO(NetIOBase):
             connection.worker_obj.on_connect()
             self.check_is_connection_need_to_sent_data(connection)
         except:
-            self.log_exception()
+            if __debug__: self.log_exception()
             self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
 
     def on_read(self, connection: Connection):
@@ -109,14 +111,14 @@ class NetIO(NetIOBase):
                     connection.worker_obj.on_read()
                     self.check_is_connection_need_to_sent_data(connection)
                 except:
-                    self.log_exception()
+                    if __debug__: self.log_exception()
                     self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
             else:
                 self._set_connection_to_be_closed(connection, ConnectionState.io_fault)
         except BlockingIOError:
             pass
         except:
-            self.log_exception()
+            if __debug__: self.log_exception()
             self._set_connection_to_be_closed(connection, ConnectionState.io_fault)
 
     def on_write(self, connection: Connection):
@@ -129,12 +131,12 @@ class NetIO(NetIOBase):
                     connection.worker_obj.on_no_more_data_to_write()
                     self.check_is_connection_need_to_sent_data(connection)
                 except:
-                    self.log_exception()
+                    if __debug__: self.log_exception()
                     self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
         except BlockingIOError:
             pass
         except:
-            self.log_exception()
+            if __debug__: self.log_exception()
             self._set_connection_to_be_closed(connection, ConnectionState.io_fault)
 
     def on_close(self, connection: Connection):
@@ -144,7 +146,7 @@ class NetIO(NetIOBase):
         try:
             connection.worker_obj.on_connection_lost()
         except:
-            self.log_exception()
+            if __debug__: self.log_exception()
             pass
 
     def _get_new_connection_id(self):
@@ -203,7 +205,7 @@ class NetIO(NetIOBase):
             new_connection.worker_obj.on_connect()
             self.check_is_connection_need_to_sent_data(new_connection)
         except:
-            self.log_exception()
+            if __debug__: self.log_exception()
             self._set_connection_to_be_closed(new_connection, ConnectionState.worker_fault)
 
         return new_connection
@@ -234,8 +236,9 @@ class NetIO(NetIOBase):
         else:
             self.method.set__need_write(connection.conn, False)
 
-    @staticmethod
-    def log_exception():
+    def log_exception(self):
+        if not self.need_to_print_exceptions_info:
+            return
         exc = sys.exc_info()
         exception = exc
         error_str = '{} {}'.format(str(exception[0]), str(exception[1].args[0]))
@@ -243,4 +246,4 @@ class NetIO(NetIOBase):
         exception = exception[:2] + (formatted_traceback,)
         trace_str = ''.join(exception[2])
         result_string = '\n\tEXCEPTION:{}\n\tTRACE:{}'.format(error_str, trace_str)
-        if __debug__: print(result_string)
+        print(result_string)

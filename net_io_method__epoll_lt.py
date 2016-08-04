@@ -28,8 +28,7 @@ class IOMethodEpollLT(IOMethodBase):
                     self.interface.on_read(connection)
 
             if event & select.EPOLLHUP:
-                # Some error. Close connection
-                print('EPOLLHUP: {}'.format(connection.conn.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)))
+                # Some error. Connection should be closed
                 self.should_be_closed.add(connection.conn)
             elif event & select.EPOLLOUT:
                 # Write available. We will not write data if an error occurred
@@ -51,7 +50,8 @@ class IOMethodEpollLT(IOMethodBase):
         for conn in should_be_closed:
             if conn.fileno() in self.interface.connection_by_fileno:
                 connection = self.interface.connection_by_fileno[conn.fileno()]
-                self.interface.on_close(connection)
+                self.interface.on_close(connection)  # self.remove_connection() should be run from inside of this
+                #   callback
             else:
                 self.remove_connection(conn)
 
@@ -66,14 +66,10 @@ class IOMethodEpollLT(IOMethodBase):
         self.epoll.unregister(conn.fileno())
 
     def set__need_write(self, conn: socket.socket, state=True):
-        try:
-            if state:
-                self.epoll.modify(conn.fileno(), select.EPOLLIN | select.EPOLLOUT)
-            else:
-                self.epoll.modify(conn.fileno(), select.EPOLLIN)
-        except ValueError as err:
-            print(err)
-            raise err
+        if state:
+            self.epoll.modify(conn.fileno(), select.EPOLLIN | select.EPOLLOUT)
+        else:
+            self.epoll.modify(conn.fileno(), select.EPOLLIN)
 
     def set__should_be_closed(self, conn: socket.socket):
         self.should_be_closed.add(conn)
