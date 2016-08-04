@@ -33,11 +33,13 @@ class MainWorker(WorkerBase):
         self.is_connection_to_the_server = False
         self.server_address = None
         self.unknown__client_or_server_connection = True
+        self.is_on_connect_was_called = False
 
         self.input_rpc_handlers = dict()
         self.prepare_input_rpc_handlers()
 
     def on_connect(self):
+        self.is_on_connect_was_called = True
         if ConnectionType.passive == self.connection.connection_info.connection_type:
             self.process__on_connect__as_passive_connection()
         else:
@@ -68,7 +70,8 @@ class MainWorker(WorkerBase):
         self.change_number_of_connected_clients(0)
 
     def process__on_connect__as_an_active_connection(self):
-        pass
+        if self.is_connection_to_the_server:
+            print('SERVER ARRIVED: {}'.format(self.server_address))
 
     def process__on_connection_lost__as_passive_connection(self):
         # This is was passive socket
@@ -81,6 +84,10 @@ class MainWorker(WorkerBase):
         if self.is_connection_to_the_server:
             # if connection to the server
             self.unregister_current_connection_to_the_server()
+            if self.is_on_connect_was_called:
+                # if on_connection_lost() was called NOT immediately after connection creation because of some error
+                # (peer is not accessible, etc.)
+                print('SERVER GONE: {}'.format(self.server_address))
         else:
             # if connection to the client
             if not self.unknown__client_or_server_connection:
@@ -94,7 +101,6 @@ class MainWorker(WorkerBase):
         worker_obj.global_data.deployed_servers_addresses[worker_obj.server_address] = connection
         worker_obj.global_data.server_by_connection_id[connection.connection_id] = worker_obj.server_address
         worker_obj.global_data.clients_per_server[worker_obj.server_address] = 0
-        print('SERVER ARRIVED: {}'.format(worker_obj.server_address))
 
     def register_current_connection_as_a_connection_to_the_server(self, address=None):
         self.register_connection_as_a_connection_to_the_server(self.connection, address)
@@ -111,10 +117,8 @@ class MainWorker(WorkerBase):
             if server_address in worker_obj.global_data.clients_per_server:
                 del worker_obj.global_data.clients_per_server[server_address]
         connection.worker_obj.is_connection_to_the_server = False
-        print('SERVER SUCCESSFULLY UNREGISTERED: {}'.format(server_address))
 
     def unregister_current_connection_to_the_server(self):
-        print('SERVER GONE: {}'.format(self.server_address))
         self.unregister_connection_to_the_server(self.connection)
 
     def change_number_of_connected_clients(self, delta_num: int):
@@ -224,6 +228,7 @@ class MainWorker(WorkerBase):
                 self.unknown__client_or_server_connection = False
             if self.global_data.deployed_servers_addresses[address] is None:
                 self.register_current_connection_as_a_connection_to_the_server(address)
+                print('SERVER ARRIVED: {}'.format(address))
         else:
             self.api.remove_connection(self.connection)
 
