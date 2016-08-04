@@ -87,6 +87,10 @@ class Connection:
         self.worker_obj = connection_info.worker_obj
         self.read_data = b''  # already read data
         self.must_be_written_data = memoryview(b'')  # this data should be written
+        self.force_write_call = False
+
+    def add_must_be_written_data(self, data):
+        self.must_be_written_data = memoryview(bytes(self.must_be_written_data) + data)
 
 
 class NetIOUserApi:

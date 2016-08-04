@@ -1,3 +1,5 @@
+import os
+
 """
 Module Docstring
 Docstrings: http://www.python.org/dev/peps/pep-0257/
@@ -6,7 +8,7 @@ Docstrings: http://www.python.org/dev/peps/pep-0257/
 __author__ = 'ButenkoMS <gtalk@butenkoms.space>'
 
 
-FILE_NAME = 'server_list.txt'
+FILE_NAME = './PycharmProjects/crytek-test-project/server_list.txt'
 
 
 def load_server_list(file_name=FILE_NAME):

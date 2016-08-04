@@ -1,4 +1,6 @@
 from net_io_abstract import *
+import sys
+import traceback
 
 
 """
@@ -80,10 +82,12 @@ class NetIO(NetIOBase):
                 new_connection.worker_obj.on_connect()
                 self.check_is_connection_need_to_sent_data(new_connection)
             except:
+                self.log_exception()
                 self._set_connection_to_be_closed(new_connection, ConnectionState.worker_fault)
         except BlockingIOError:
             pass
         except:
+            self.log_exception()
             if new_conn is not None:
                 self.method.should_be_closed.add(new_conn)
 
@@ -93,6 +97,7 @@ class NetIO(NetIOBase):
             connection.worker_obj.on_connect()
             self.check_is_connection_need_to_sent_data(connection)
         except:
+            self.log_exception()
             self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
 
     def on_read(self, connection: Connection):
@@ -104,27 +109,32 @@ class NetIO(NetIOBase):
                     connection.worker_obj.on_read()
                     self.check_is_connection_need_to_sent_data(connection)
                 except:
+                    self.log_exception()
                     self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
             else:
                 self._set_connection_to_be_closed(connection, ConnectionState.io_fault)
         except BlockingIOError:
             pass
         except:
+            self.log_exception()
             self._set_connection_to_be_closed(connection, ConnectionState.io_fault)
 
     def on_write(self, connection: Connection):
         try:
-            nsent = connection.conn.send(connection.must_be_written_data)
-            connection.must_be_written_data = connection.must_be_written_data[nsent:]
+            if connection.must_be_written_data:
+                nsent = connection.conn.send(connection.must_be_written_data)
+                connection.must_be_written_data = connection.must_be_written_data[nsent:]
             if not connection.must_be_written_data:
                 try:
                     connection.worker_obj.on_no_more_data_to_write()
                     self.check_is_connection_need_to_sent_data(connection)
                 except:
+                    self.log_exception()
                     self._set_connection_to_be_closed(connection, ConnectionState.worker_fault)
         except BlockingIOError:
             pass
         except:
+            self.log_exception()
             self._set_connection_to_be_closed(connection, ConnectionState.io_fault)
 
     def on_close(self, connection: Connection):
@@ -134,6 +144,7 @@ class NetIO(NetIOBase):
         try:
             connection.worker_obj.on_connection_lost()
         except:
+            self.log_exception()
             pass
 
     def _get_new_connection_id(self):
@@ -192,6 +203,7 @@ class NetIO(NetIOBase):
             new_connection.worker_obj.on_connect()
             self.check_is_connection_need_to_sent_data(new_connection)
         except:
+            self.log_exception()
             self._set_connection_to_be_closed(new_connection, ConnectionState.worker_fault)
 
         return new_connection
@@ -215,9 +227,20 @@ class NetIO(NetIOBase):
         self.method.set__should_be_closed(connection.conn)
 
     def check_is_connection_need_to_sent_data(self, connection: Connection):
-        if connection.must_be_written_data:
+        if connection.must_be_written_data or connection.force_write_call:
             if not isinstance(connection.must_be_written_data, memoryview):
                 connection.must_be_written_data = memoryview(connection.must_be_written_data)
             self.method.set__need_write(connection.conn, True)
         else:
             self.method.set__need_write(connection.conn, False)
+
+    @staticmethod
+    def log_exception():
+        exc = sys.exc_info()
+        exception = exc
+        error_str = '{} {}'.format(str(exception[0]), str(exception[1].args[0]))
+        formatted_traceback = traceback.format_exception(exception[0], exception[1], exception[2])
+        exception = exception[:2] + (formatted_traceback,)
+        trace_str = ''.join(exception[2])
+        result_string = '\n\tEXCEPTION:{}\n\tTRACE:{}'.format(error_str, trace_str)
+        if __debug__: print(result_string)

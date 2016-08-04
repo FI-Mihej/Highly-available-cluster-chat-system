@@ -29,6 +29,7 @@ class IOMethodEpollLT(IOMethodBase):
 
             if event & select.EPOLLHUP:
                 # Some error. Close connection
+                print('EPOLLHUP: {}'.format(connection.conn.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)))
                 self.should_be_closed.add(connection.conn)
             elif event & select.EPOLLOUT:
                 # Write available. We will not write data if an error occurred

@@ -24,3 +24,26 @@ class RPCName:
     best_server = 7
     give_me_clients_per_server = 8
     clients_per_server = 9
+    client_arrived = 10
+
+RPC_REQUESTS_ONLY_FROM_SERVER = {
+    RPCName.server_arrived,
+    RPCName.number_of_clients_changed,
+    RPCName.broadcast_string,
+    RPCName.print_string,
+}
+
+RPC_RESPONSES_ONLY_FROM_SERVER = {
+    RPCName.best_server,
+    RPCName.clients_per_server,
+}
+
+RPC_REQUESTS_ONLY_FROM_CLIENT = {
+    RPCName.client_string,
+    RPCName.give_me_best_server,
+    RPCName.give_me_clients_per_server,
+    RPCName.client_arrived
+}
+
+RPC_RESPONSES_ONLY_FROM_CLIENT = {
+}

@@ -28,75 +28,127 @@ class GlobalDataForAllWorkers:
 
 class MainWorker(WorkerBase):
     def __init__(self, global_data: GlobalDataForAllWorkers):
+        print('>> __init__')
         super().__init__()
         self.global_data = global_data
         self.is_connection_to_the_server = False
         self.server_address = None
+        self.unknown__client_or_server_connection = True
 
         self.input_rpc_handlers = dict()
         self.prepare_input_rpc_handlers()
+        print()
 
     def on_connect(self):
+        print('>> on_connection. ID: {}'.format(self.connection.connection_id))
+        sockname = self.connection.conn.getsockname()
+        peername = None
         if ConnectionType.passive == self.connection.connection_info.connection_type:
-            # this is passive socket.
-            # send 'server arrived' message to other servers
-            self.connection.conn.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-            self.broadcast_server_arrived_message()
-            self.broadcast_number_of_clients_changed()
+            print('passive on {}'.format(sockname))
         else:
-            if not self.is_connection_to_the_server:
-                address = self.connection.connection_info.socket_address
-                if address in self.global_data.deployed_servers_addresses:
-                    self.register_connection_as_a_connection_to_the_server(address)
-                else:
-                    # if connection to the client (if this is server - data will be corrected.
-                    # See rpc_input__server_arrived()
-                    self.change_number_of_connected_clients(1)
+            if ConnectionState.connected == self.connection.connection_state:
+                peername = self.connection.conn.getpeername()
+            print('active from {} to {}'.format(sockname, peername))
+
+        if ConnectionType.passive == self.connection.connection_info.connection_type:
+            self.process__on_connect__as_passive_connection()
+        else:
+            self.process__on_connect__as_an_active_connection()
+        print()
 
     def on_read(self):
+        print('>> on_read. ID: {}'.format(self.connection.connection_id))
         try:
             while True:
                 message, remaining_data = get_message(self.connection.read_data)
                 self.connection.read_data = remaining_data
                 self.input_message_handler(message)
         except ThereIsNoMessages:
+            print()
             return
 
     def on_connection_lost(self):
+        print('>> on_connection_lost. ID: {}; Address: {}'.format(
+            self.connection.connection_id, self.connection.connection_info.socket_address))
         if ConnectionType.passive == self.connection.connection_info.connection_type:
-            # This is was passive socket
-            # Try to restart passive connection:
-            new_connection_info = copy.copy(self.connection.connection_info)
-            self.api.make_connection(new_connection_info, self.connection.connection_name)
+            self.process__on_connection_lost__as_passive_connection()
         else:
-            # if active connection
-            if self.is_connection_to_the_server:
-                # if connection to the server
-                self.unregister_connection_as_a_connection_to_the_server()
-            else:
-                # if connection to the client
-                self.change_number_of_connected_clients(-1)
+            self.process__on_connection_lost__as_an_active_connection()
+        print()
 
     def __copy__(self):
+        print("__copy__")
+        print()
         return type(self)(self.global_data)
 
-    def register_connection_as_a_connection_to_the_server(self, address):
-        self.server_address = address
-        self.global_data.deployed_servers_addresses[address] = self.connection
-        self.global_data.server_by_connection_id[self.connection.connection_id] = address
+    def process__on_connect__as_passive_connection(self):
+        # this is passive socket.
+        # send 'server arrived' message to other servers
+        print('SERVER IS UP - BROADCASTING SERVER ARRIVED MESSAGES')
+        self.connection.conn.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        # self.broadcast_request__to_servers__server_arrived()
+        self.change_number_of_connected_clients(0)
 
-    def unregister_connection_as_a_connection_to_the_server(self):
-        if self.connection.connection_info.socket_address in self.global_data.deployed_servers_addresses:
-            self.global_data.deployed_servers_addresses[self.connection.connection_info.socket_address] = None
-        if self.connection.connection_id in self.global_data.server_by_connection_id:
-            del self.global_data.server_by_connection_id[self.connection.connection_id]
-        if self.server_address is not None:
-            del self.global_data.clients_per_server[self.server_address]
+    def process__on_connect__as_an_active_connection(self):
+        pass
+
+    def process__on_connection_lost__as_passive_connection(self):
+        # This is was passive socket
+        # Try to restart passive connection:
+        new_connection_info = copy.copy(self.connection.connection_info)
+        self.api.make_connection(new_connection_info, self.connection.connection_name)
+
+    def process__on_connection_lost__as_an_active_connection(self):
+        # if active connection
+        if self.is_connection_to_the_server:
+            # if connection to the server
+            self.unregister_current_connection_to_the_server()
+        else:
+            # if connection to the client
+            if not self.unknown__client_or_server_connection:
+                self.change_number_of_connected_clients(-1)
+
+    @staticmethod
+    def register_connection_as_a_connection_to_the_server(connection, address=None):
+        worker_obj = connection.worker_obj
+        worker_obj.server_address = address or worker_obj.server_address
+        # if worker_obj.global_data.deployed_servers_addresses[worker_obj.server_address] is not None:
+        #     print('SERVER ALREADY REGISTERED: {}'.format(worker_obj.server_address))
+        #     old_server_connection = worker_obj.global_data.deployed_servers_addresses[worker_obj.server_address]
+        #     worker_obj.unregister_connection_to_the_server(old_server_connection)
+        #     worker_obj.api.remove_connection(old_server_connection)
+        worker_obj.is_connection_to_the_server = True
+        worker_obj.global_data.deployed_servers_addresses[worker_obj.server_address] = connection
+        worker_obj.global_data.server_by_connection_id[connection.connection_id] = worker_obj.server_address
+        worker_obj.global_data.clients_per_server[worker_obj.server_address] = 0
+        print('SERVER ARRIVED: {}'.format(worker_obj.server_address))
+
+    def register_current_connection_as_a_connection_to_the_server(self, address=None):
+        self.register_connection_as_a_connection_to_the_server(self.connection, address)
+
+    @staticmethod
+    def unregister_connection_to_the_server(connection):
+        worker_obj = connection.worker_obj
+        server_address = worker_obj.server_address
+        if connection.connection_info.socket_address in worker_obj.global_data.deployed_servers_addresses:
+            worker_obj.global_data.deployed_servers_addresses[connection.connection_info.socket_address] = None
+        if connection.connection_id in worker_obj.global_data.server_by_connection_id:
+            del worker_obj.global_data.server_by_connection_id[connection.connection_id]
+        if server_address is not None:
+            if server_address in worker_obj.global_data.clients_per_server:
+                del worker_obj.global_data.clients_per_server[server_address]
+        connection.worker_obj.is_connection_to_the_server = False
+        print('SERVER SUCCESSFULLY UNREGISTERED: {}'.format(server_address))
+
+    def unregister_current_connection_to_the_server(self):
+        print('SERVER GONE: {}'.format(self.server_address))
+        self.unregister_connection_to_the_server(self.connection)
 
     def change_number_of_connected_clients(self, delta_num: int):
+        print('change_number_of_connected_clients: delta_num=={}'.format(delta_num))
         self.global_data.number_of_clients += delta_num
         self.global_data.clients_per_server[self.global_data.own_address] = self.global_data.number_of_clients
-        self.broadcast_number_of_clients_changed()
+        self.broadcast_request__to_servers__number_of_clients_changed()
 
     def check_connection_to_the_server(self, address)->Connection:
         '''
@@ -113,21 +165,25 @@ class MainWorker(WorkerBase):
             new_connection = self.api.make_connection(new_connection_info)
             self.global_data.deployed_servers_addresses[address] = new_connection
             connection = new_connection
+            self.register_connection_as_a_connection_to_the_server(connection, address)
+            self.send_request__server_arrived(connection)
         return connection
 
-    def broadcast_server_arrived_message(self):
-        for address in self.global_data.deployed_servers_addresses:
-            connection = self.check_connection_to_the_server(address)
-            message = {
-                FieldName.name: RPCName.server_arrived,
-                FieldName.address: self.global_data.own_address
-            }
-            bin_message = marshal.dumps(message)
-            packed_message = pack_message(bin_message)
-            connection.must_be_written_data += packed_message
-            self.api.check_is_connection_need_to_sent_data(connection)
+    def send_request__server_arrived(self, connection):
+        message = {
+            FieldName.name: RPCName.server_arrived,
+            FieldName.address: self.global_data.own_address
+        }
+        bin_message = marshal.dumps(message)
+        packed_message = pack_message(bin_message)
+        connection.add_must_be_written_data(packed_message)
+        self.api.check_is_connection_need_to_sent_data(connection)
 
-    def broadcast_number_of_clients_changed(self):
+    def broadcast_request__to_servers__server_arrived(self):
+        for address in self.global_data.deployed_servers_addresses:
+            self.check_connection_to_the_server(address)
+
+    def broadcast_request__to_servers__number_of_clients_changed(self):
         for address in self.global_data.deployed_servers_addresses:
             connection = self.check_connection_to_the_server(address)
             message = {
@@ -136,10 +192,10 @@ class MainWorker(WorkerBase):
             }
             bin_message = marshal.dumps(message)
             packed_message = pack_message(bin_message)
-            connection.must_be_written_data += packed_message
+            connection.add_must_be_written_data(packed_message)
             self.api.check_is_connection_need_to_sent_data(connection)
 
-    def broadcast_client_string(self, client_string):
+    def broadcast_request__to_servers__client_string(self, client_string):
         for address in self.global_data.deployed_servers_addresses:
             connection = self.check_connection_to_the_server(address)
             message = {
@@ -148,27 +204,37 @@ class MainWorker(WorkerBase):
             }
             bin_message = marshal.dumps(message)
             packed_message = pack_message(bin_message)
-            connection.must_be_written_data += packed_message
+            connection.add_must_be_written_data(packed_message)
             self.api.check_is_connection_need_to_sent_data(connection)
 
-    def broadcast_client_string_to_own_clients(self, client_string):
+    def broadcast_request__to_own_clients__client_string(self, client_string):
         for connection in self.api.all_connections:
+            if ConnectionState.connected != connection.connection_state:
+                continue
             if connection.worker_obj.is_connection_to_the_server:
                 continue
             if connection == self.connection:
                 continue
+
             message = {
                 FieldName.name: RPCName.print_string,
                 FieldName.string: client_string
             }
             bin_message = marshal.dumps(message)
             packed_message = pack_message(bin_message)
-            connection.must_be_written_data += packed_message
+            connection.add_must_be_written_data(packed_message)
             self.api.check_is_connection_need_to_sent_data(connection)
 
     def input_message_handler(self, message: bytes):
         message = marshal.loads(message)
-        self.input_rpc_handlers[message[FieldName.name]](message)
+        print('IN: {}'.format(message))
+
+        if message[FieldName.name] in self.input_rpc_handlers:
+            # run rpc handler
+            self.input_rpc_handlers[message[FieldName.name]](message)
+        else:
+            print('WRONG RPC')
+        print()
 
     def prepare_input_rpc_handlers(self):
         self.input_rpc_handlers = {
@@ -177,17 +243,24 @@ class MainWorker(WorkerBase):
             RPCName.client_string: self.rpc_input__client_string,
             RPCName.give_me_best_server: self.rpc_input__give_me_best_server,
             RPCName.give_me_clients_per_server: self.rpc_input__give_me_clients_per_server,
+            RPCName.broadcast_string: self.rpc_input__broadcast_string,
+            RPCName.client_arrived: self.rpc_input__client_arrived,
         }
 
     def rpc_input__server_arrived(self, message):
         address = message[FieldName.address]
         if address in self.global_data.deployed_servers_addresses:
-            if not self.is_connection_to_the_server:
-                self.change_number_of_connected_clients(-1)
-                self.is_connection_to_the_server = True
-            self.register_connection_as_a_connection_to_the_server(address)
+            if self.unknown__client_or_server_connection:
+                self.unknown__client_or_server_connection = False
+            if self.global_data.deployed_servers_addresses[address] is None:
+                self.register_current_connection_as_a_connection_to_the_server(address)
         else:
             self.api.remove_connection(self.connection)
+
+    def rpc_input__client_arrived(self, message):
+        if self.unknown__client_or_server_connection:
+            self.unknown__client_or_server_connection = False
+        self.change_number_of_connected_clients(1)
 
     def rpc_input__number_of_clients_changed(self, message):
         if self.server_address is not None:
@@ -195,8 +268,8 @@ class MainWorker(WorkerBase):
 
     def rpc_input__client_string(self, message):
         client_string = message[FieldName.string]
-        self.broadcast_client_string(client_string)
-        self.broadcast_client_string_to_own_clients(client_string)
+        self.broadcast_request__to_servers__client_string(client_string)
+        self.broadcast_request__to_own_clients__client_string(client_string)
 
     def rpc_input__give_me_best_server(self, message):
         best_server_address = min(self.global_data.clients_per_server, key=self.global_data.clients_per_server.get)
@@ -206,7 +279,7 @@ class MainWorker(WorkerBase):
         }
         bin_message = marshal.dumps(message)
         packed_message = pack_message(bin_message)
-        self.connection.must_be_written_data += packed_message
+        self.connection.add_must_be_written_data(packed_message)
 
     def rpc_input__give_me_clients_per_server(self, message):
         message = {
@@ -215,7 +288,11 @@ class MainWorker(WorkerBase):
         }
         bin_message = marshal.dumps(message)
         packed_message = pack_message(bin_message)
-        self.connection.must_be_written_data += packed_message
+        self.connection.add_must_be_written_data(packed_message)
+
+    def rpc_input__broadcast_string(self, message):
+        client_string = message[FieldName.string]
+        self.broadcast_request__to_own_clients__client_string(client_string)
 
 
 class Server(Process):
@@ -245,10 +322,18 @@ class Server(Process):
 
 
 def main():
+    all_server_list = load_server_list()
+
     server_number = 0
     if len(sys.argv) > 1:
         server_number = int(sys.argv[1])
-    all_server_list = load_server_list()
+    else:
+        index = 0
+        for address in all_server_list:
+            print(index, address)
+            index += 1
+        server_number = int(input('ENTER SERVER NUMBER:'))
+
     server = Server(all_server_list[server_number], all_server_list)
     server.run()
 
