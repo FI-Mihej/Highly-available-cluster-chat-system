@@ -66,10 +66,14 @@ class IOMethodEpollLT(IOMethodBase):
         self.epoll.unregister(conn.fileno())
 
     def set__need_write(self, conn: socket.socket, state=True):
-        if state:
-            self.epoll.modify(conn.fileno(), select.EPOLLIN | select.EPOLLOUT)
-        else:
-            self.epoll.modify(conn.fileno(), select.EPOLLIN)
+        try:
+            if state:
+                self.epoll.modify(conn.fileno(), select.EPOLLIN | select.EPOLLOUT)
+            else:
+                self.epoll.modify(conn.fileno(), select.EPOLLIN)
+        except ValueError as err:
+            print(err)
+            raise err
 
     def set__should_be_closed(self, conn: socket.socket):
         self.should_be_closed.add(conn)
