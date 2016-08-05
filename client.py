@@ -39,8 +39,10 @@ class MainWorker(WorkerBase):
 
         self.input_rpc_handlers = dict()
         self.prepare_input_rpc_handlers()
+        self.is_on_connect_was_called = False
 
     def on_connect(self):
+        self.is_on_connect_was_called = True
         if self.global_data.clients_per_server:
             # already got clients_per_server dict. This means that we currently already connected to best server.
             # We can start working now
@@ -78,16 +80,22 @@ class MainWorker(WorkerBase):
             print('CONNECTION WITH THE SERVER ({}) IS LOST. WILL TRY TO RECONNECT TO THE CLUSTER'.format(
                 self.server_address))
 
-        self.connected_to_destination_server = False
-
         if not self.is_normal_reconnection:
             # disconnection because of some error. So we do not want to probe faulty server again at this time
             if self.server_address in self.global_data.clients_per_server:
                 del self.global_data.clients_per_server[self.server_address]
 
+        # if there was a working session with a destination server (it could take from milliseconds up to days and
+        # years between connection to and disconnection from destination server) - we need to update clients_per_server
+        # dict before actual reconnection
+        if self.connected_to_destination_server and self.is_on_connect_was_called:
+            self.global_data.clients_per_server = dict()
+
+        self.connected_to_destination_server = False
+
         server_address = None
         if self.global_data.clients_per_server:
-            # try to reconnect to next best server
+            # try to reconnect to next best server from the list
             server_address = self.process__on_connection_lost__already_got_clients_per_server_dict()
         else:
             # try to reconnect to random server
