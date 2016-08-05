@@ -220,10 +220,15 @@ class NetIOCallbacks:
 
 class NetIOBase(NetIOUserApi, NetIOCallbacks):
     '''
-    Base class for any IO implementation.
+    Base class for any IO implementation (Linux, BSD, Windows, cross platform, etc.).
     '''
-    def __init__(self):
+    def __init__(self, transport):
+        '''
+
+        :param transport: class of the desired IOMethod. Instance (object) will be created by NetIOBase itself
+        '''
         super().__init__()
+        self.method = transport(self)
 
     def destroy(self):
         raise NotImplementedError()

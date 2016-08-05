@@ -13,8 +13,7 @@ __author__ = 'ButenkoMS <gtalk@butenkoms.space>'
 
 class NetIO(NetIOBase):
     def __init__(self, transport):
-        super().__init__()
-        self.method = transport(self)
+        super().__init__(transport)
 
         self._need_to_stop = False
         self._already_begun = False
