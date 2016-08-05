@@ -45,7 +45,8 @@ class MainWorker(WorkerBase):
         self.is_on_connect_was_called = True
 
         self.connection.force_write_call = True  # from this moment, on_no_more_data_to_write() will be called
-        #   continuously. So we wil be able to check 'exit' command
+        #   continuously. So we wil be able to check 'exit' command within on_no_more_data_to_write() callback at any
+        #   time, even if we still not connected to the destination server.
 
         if self.global_data.clients_per_server:
             # already got clients_per_server dict. This means that we currently already connected to best server.
@@ -72,22 +73,24 @@ class MainWorker(WorkerBase):
 
     def on_connection_lost(self):
         self.check_for_exit()  # we need to check it here to prevent hung: to be able to stop client even if there is
-        # no running servers in the cluster at all (in this situation client will tend to infinitely retry the
-        # connection to the cluster if user will not stop it).
+        #   no running servers in the cluster at all (in this situation client will tend to infinitely retry the
+        #   connection to the cluster if user will not stop it).
 
+        self.print_an_appropriate_server_reconnection_message_to_the_console()
+
+        self.check_and_maybe_remove_faulty_destination_server_from_the_clients_per_server_dict()
+        self.check_whether_we_need_to_update_the_existing_clients_per_server_dict()
+        self.reconnect_to_the_new_server_from_the_cluster()
+
+    def __copy__(self):
+        return type(self)(self.global_data)
+
+    def print_an_appropriate_server_reconnection_message_to_the_console(self):
         if self.is_normal_reconnection:
             print('SWITCHING CLUSTER SERVER'.format())
         else:
             print('CONNECTION WITH THE SERVER ({}) IS LOST. WILL TRY TO RECONNECT TO THE CLUSTER'.format(
                 self.server_address))
-
-        self.check_and_maybe_remove_faulty_destination_server_from_the_clients_per_server_dict()
-        self.check_whether_we_need_to_update_the_existing_clients_per_server_dict()
-        self.reconnect_to_the_new_server_from_the_cluster()
-        self.connected_to_destination_server = False
-
-    def __copy__(self):
-        return type(self)(self.global_data)
 
     def check_and_send_user_strings_to_the_server(self):
         with self.global_data.lock_for__input_messages:
