@@ -43,6 +43,10 @@ class MainWorker(WorkerBase):
 
     def on_connect(self):
         self.is_on_connect_was_called = True
+
+        self.connection.force_write_call = True  # from this moment, on_no_more_data_to_write() will be called
+        #   continuously. So we wil be able to check 'exit' command
+
         if self.global_data.clients_per_server:
             # already got clients_per_server dict. This means that we currently already connected to best server.
             # We can start working now
@@ -61,38 +65,56 @@ class MainWorker(WorkerBase):
             return
 
     def on_no_more_data_to_write(self):
+        self.check_for_exit()
         if self.connected_to_destination_server:
-            # server has send all data, so we ned to check user input for some new strings
-            with self.global_data.lock_for__input_messages:
-                if self.global_data.input_messages:
-                    for string in self.global_data.input_messages:
-                        self.send_request__client_string(string)
-                    self.global_data.input_messages = list()
-
-            with self.global_data.lock_for__need_to_exit:
-                if self.global_data.need_to_exit:
-                    self.api.stop()
+            # server has sent all data, so we ned to check user input for some new strings
+            self.check_and_send_user_strings_to_the_server()
 
     def on_connection_lost(self):
+        self.check_for_exit()  # we need to check it here to prevent hung: to be able to stop client even if there is
+        # no running servers in the cluster at all (in this situation client will tend to infinitely retry the
+        # connection to the cluster if user will not stop it).
+
         if self.is_normal_reconnection:
             print('SWITCHING CLUSTER SERVER'.format())
         else:
             print('CONNECTION WITH THE SERVER ({}) IS LOST. WILL TRY TO RECONNECT TO THE CLUSTER'.format(
                 self.server_address))
 
+        self.check_and_maybe_remove_faulty_destination_server_from_the_clients_per_server_dict()
+        self.check_whether_we_need_to_update_the_existing_clients_per_server_dict()
+        self.reconnect_to_the_new_server_from_the_cluster()
+        self.connected_to_destination_server = False
+
+    def __copy__(self):
+        return type(self)(self.global_data)
+
+    def check_and_send_user_strings_to_the_server(self):
+        with self.global_data.lock_for__input_messages:
+            if self.global_data.input_messages:
+                for string in self.global_data.input_messages:
+                    self.send_request__client_string(string)
+                self.global_data.input_messages = list()
+
+    def check_for_exit(self):
+        with self.global_data.lock_for__need_to_exit:
+            if self.global_data.need_to_exit:
+                self.api.stop()
+
+    def check_and_maybe_remove_faulty_destination_server_from_the_clients_per_server_dict(self):
         if not self.is_normal_reconnection:
             # disconnection because of some error. So we do not want to probe faulty server again at this time
             if self.server_address in self.global_data.clients_per_server:
                 del self.global_data.clients_per_server[self.server_address]
 
+    def check_whether_we_need_to_update_the_existing_clients_per_server_dict(self):
         # if there was a working session with a destination server (it could take from milliseconds up to days and
         # years between connection to and disconnection from destination server) - we need to update clients_per_server
         # dict before actual reconnection
         if self.connected_to_destination_server and self.is_on_connect_was_called:
             self.global_data.clients_per_server = dict()
 
-        self.connected_to_destination_server = False
-
+    def reconnect_to_the_new_server_from_the_cluster(self):
         server_address = None
         if self.global_data.clients_per_server:
             # try to reconnect to next best server from the list
@@ -101,9 +123,6 @@ class MainWorker(WorkerBase):
             # try to reconnect to random server
             server_address = self.process__on_connection_lost__still_need_to_get_clients_per_server_dict()
         self.make_connection_to_the_server(server_address)
-
-    def __copy__(self):
-        return type(self)(self.global_data)
 
     def process__on_connect__already_got_clients_per_server_dict(self):
         self.mark_this_connection_as_connection_to_destination_server()
@@ -134,8 +153,6 @@ class MainWorker(WorkerBase):
         self.connected_to_destination_server = True
         print()
         print('SUCCESSFULLY CONNECTED TO THE DESTINATION SERVER ({})'.format(self.server_address))
-        self.connection.force_write_call = True  # from this moment, on_no_more_data_to_write() will be called
-        #   continuously
         self.send_request__client_arrived()
 
     def send_request__client_arrived(self):
