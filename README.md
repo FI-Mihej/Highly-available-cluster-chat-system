@@ -1,6 +1,4 @@
-This was a test task from one famous company.
-
-# In two words: 
+# In a few words: 
 It is a simple, highly available cluster chat system made by me in three days from scratch. (Without using any frameworks: there is no asyncio, no tornado, etc. There was used only pure socket API).
 
 # Features:
@@ -20,6 +18,3 @@ At first you need to prepare servers list. All servers and all clients should ha
 
 # Requirements (for both server and client):
 **Linux** (with at least 2.5.44 kernel, and glibs of at least 2.3.2 version: chat system is using **epoll** for an async IO); **CPython 3.5+**
-
-# Original task with comments:
-_Actually I don't see why should I share it: purpose of this system and requirements are clear anyway._
